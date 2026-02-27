@@ -254,7 +254,13 @@
       }
 
       async function copyNode() {
-        const sample = `import fetch from 'node-fetch';\n\nasync function main() {\n  const res = await fetch('https://my-hook.dajneem23.workers.dev/webhook', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ event: 'hello' }),\n  });\n\n  const data = await res.json();\n  console.log(data);\n}\n\nmain().catch(console.error);`;
+        const sample = `
+        fetch('https://my-hook.dajneem23.workers.dev/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'hello' }),
+        })
+        `
         await navigator.clipboard.writeText(sample);
         statusLine.textContent = 'Copied Node fetch sample';
       }
