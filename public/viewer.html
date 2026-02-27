@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Webhook Log Viewer</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card: #111827;
+        --muted: #9ca3af;
+        --accent: #22d3ee;
+        --accent-2: #fbbf24;
+        --border: #1f2937;
+        --text: #e5e7eb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Manrope", "Trebuchet MS", "Segoe UI", sans-serif;
+        background: radial-gradient(circle at 20% 20%, #12213d, var(--bg));
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      .page {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: -0.01em;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(34, 211, 238, 0.1);
+        color: #a5f3fc;
+        border: 1px solid rgba(34, 211, 238, 0.2);
+        font-size: 13px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 18px 18px 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      button {
+        background: linear-gradient(135deg, #22d3ee, #0ea5e9);
+        color: #0b1120;
+        border: none;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        cursor: pointer;
+        transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 30px rgba(14, 165, 233, 0.35);
+      }
+
+      button.secondary {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+        box-shadow: none;
+      }
+
+      button.secondary:hover {
+        border-color: #334155;
+      }
+
+      .log-list {
+        display: grid;
+        gap: 12px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .entry {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: rgba(255, 255, 255, 0.01);
+      }
+
+      .entry-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+
+      .entry-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .badge {
+        padding: 4px 8px;
+        border-radius: 8px;
+        background: rgba(251, 191, 36, 0.12);
+        color: #fde68a;
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        font-size: 12px;
+      }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border);
+        padding: 10px;
+        border-radius: 10px;
+        font-size: 13px;
+        color: #cbd5f5;
+        overflow-x: auto;
+      }
+
+      .empty {
+        text-align: center;
+        color: var(--muted);
+        padding: 24px 0;
+      }
+
+      .toast {
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <div>
+          <h1>Webhook Log Viewer</h1>
+          <div class="pill">Live snapshots of incoming payloads</div>
+        </div>
+        <button id="refresh">Refresh</button>
+      </header>
+
+      <div class="card">
+        <div class="controls">
+          <div class="toast" id="status">Waiting for data…</div>
+          <button class="secondary" id="clear">Clear logs</button>
+          <button id="copy">Copy curl example</button>
+          <button id="copy-node">Copy Node fetch</button>
+        </div>
+        <ul class="log-list" id="log-list"></ul>
+      </div>
+    </div>
+
+    <script>
+      const list = document.getElementById('log-list');
+      const statusLine = document.getElementById('status');
+
+      async function fetchLogs() {
+        statusLine.textContent = 'Loading logs…';
+        try {
+          const res = await fetch('/logs');
+          if (!res.ok) throw new Error('Failed to load logs');
+          const data = await res.json();
+          renderLogs(data.logs || []);
+          statusLine.textContent = `Showing ${data.logs?.length ?? 0} entr${
+            (data.logs?.length ?? 0) === 1 ? 'y' : 'ies'
+          }`;
+        } catch (error) {
+          statusLine.textContent = error.message;
+        }
+      }
+
+      function renderLogs(logs) {
+        list.innerHTML = '';
+        if (!logs.length) {
+          list.innerHTML = '<div class="empty">No logs yet. Send a POST to /webhook to see them appear.</div>';
+          return;
+        }
+
+        [...logs].reverse().forEach((log) => {
+          const item = document.createElement('li');
+          item.className = 'entry';
+          const header = document.createElement('div');
+          header.className = 'entry-header';
+
+          const meta = document.createElement('div');
+          meta.className = 'entry-meta';
+          const ts = new Date(log.timestamp || Date.now()).toLocaleString();
+          meta.textContent = ts;
+
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = log.headers?.['content-type'] || 'unknown';
+
+          header.appendChild(meta);
+          header.appendChild(badge);
+
+          const body = document.createElement('pre');
+          body.textContent = JSON.stringify(log.body, null, 2);
+
+          item.appendChild(header);
+          item.appendChild(body);
+          list.appendChild(item);
+        });
+      }
+
+      async function clearLogs() {
+        statusLine.textContent = 'Clearing…';
+        await fetch('/logs', { method: 'DELETE' });
+        await fetchLogs();
+      }
+
+      async function copyCurl() {
+        const sample = 'curl -X POST https://my-hook.dajneem23.workers.dev/webhook -H "Content-Type: application/json" -d "{\\"event\\":\\"hello\\"}"';
+        await navigator.clipboard.writeText(sample);
+        statusLine.textContent = 'Copied sample curl';
+      }
+
+      async function copyNode() {
+        const sample = `import fetch from 'node-fetch';\n\nasync function main() {\n  const res = await fetch('https://my-hook.dajneem23.workers.dev/webhook', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ event: 'hello' }),\n  });\n\n  const data = await res.json();\n  console.log(data);\n}\n\nmain().catch(console.error);`;
+        await navigator.clipboard.writeText(sample);
+        statusLine.textContent = 'Copied Node fetch sample';
+      }
+
+      document.getElementById('refresh').addEventListener('click', fetchLogs);
+      document.getElementById('clear').addEventListener('click', clearLogs);
+      document.getElementById('copy').addEventListener('click', copyCurl);
+      document.getElementById('copy-node').addEventListener('click', copyNode);
+
+      fetchLogs();
+      setInterval(fetchLogs, 6000);
+    </script>
+  </body>
+</html>

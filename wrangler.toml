@@ -1,0 +1,18 @@
+name = "my-hook"
+main = "src/worker.ts"
+compatibility_date = "2024-11-20"
+
+[vars]
+WORKER_DOMAIN = "my-hook.dajneem23.workers.dev"
+
+[assets]
+binding = "ASSETS"
+directory = "./public"
+
+[[durable_objects.bindings]]
+name = "LOG_STORE"
+class_name = "LogStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LogStore"]
